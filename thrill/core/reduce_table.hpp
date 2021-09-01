@@ -29,7 +29,7 @@ namespace core {
 
 //! Enum class to select a hash table implementation.
 enum class ReduceTableImpl {
-    PROBING, OLD_PROBING, BUCKET
+    PROBING, OLD_PROBING, BUCKET, CUCKOO
 };
 
 /*!
@@ -49,7 +49,7 @@ public:
     double bucket_rate_ = 0.6;
 
     //! select the hash table in the reduce phase by enum
-    static constexpr ReduceTableImpl table_impl_ = ReduceTableImpl::PROBING;
+    static constexpr ReduceTableImpl table_impl_ = ReduceTableImpl::CUCKOO;
 
     //! only for growing ProbingHashTable: items initially in a partition.
     static constexpr size_t initial_items_per_partition_ = 512;

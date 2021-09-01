@@ -24,7 +24,7 @@
 #include <thrill/core/reduce_functional.hpp>
 #include <thrill/core/reduce_old_probing_hash_table.hpp>
 #include <thrill/core/reduce_probing_hash_table.hpp>
-#include <thrill/core/reduce_dysect_hash_table.hpp>
+#include <thrill/core/reduce_cuckoo_hash_table.hpp>
 #include <thrill/data/block_reader.hpp>
 #include <thrill/data/block_writer.hpp>
 #include <thrill/data/file.hpp>
