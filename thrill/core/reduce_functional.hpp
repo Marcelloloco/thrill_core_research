@@ -59,11 +59,12 @@ public:
 
     Result operator () (
         const Key& k,
+        const int hash_version,
         const size_t& num_partitions,
         const size_t& /* num_buckets_per_partition */,
         const size_t& /* num_buckets_per_table */) const {
 
-        uint64_t hash = common::Hash128to64(salt_, hash_function_(k));
+        uint64_t hash = common::Hash128to64(salt_+hash_version, hash_function_(k));
 
         size_t partition_id = hash % num_partitions;
         size_t remaining_hash = hash / num_partitions;

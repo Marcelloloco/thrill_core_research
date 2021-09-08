@@ -48,6 +48,13 @@ public:
     //! relative to the maximum possible number.
     double bucket_rate_ = 0.6;
 
+    //! only for CuckooHashTable: determines after how many displacements a loop
+    //! will be declared
+    static constexpr int max_displacement_cycles_ = 15;
+
+    //! number of different hashes that can be generated
+    static constexpr int number_of_hashes_ = 3;
+
     //! select the hash table in the reduce phase by enum
     static constexpr ReduceTableImpl table_impl_ = ReduceTableImpl::CUCKOO;
 
@@ -264,9 +271,9 @@ public:
         return MakeTableItem::Reduce(a, b, reduce_function_);
     }
 
-    typename IndexFunction::Result calculate_index(const TableItem& kv) const {
+    typename IndexFunction::Result calculate_index(const TableItem& kv, const int hash = 0) const {
         return index_function_(
-            key(kv), num_partitions_, num_buckets_per_partition_, num_buckets_);
+            key(kv), hash, num_partitions_, num_buckets_per_partition_, num_buckets_);
     }
 
     //! \}

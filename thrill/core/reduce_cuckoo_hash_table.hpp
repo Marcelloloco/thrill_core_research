@@ -35,6 +35,12 @@ class ReduceCuckooHashTable
     static constexpr size_t bucket_block_size
             = ReduceConfig::bucket_block_size_;
 
+    static constexpr int max_displacement_cycles
+            = ReduceConfig::max_displacement_cycles_;
+
+    static constexpr int number_of_hashes
+            = ReduceConfig::number_of_hashes_;
+
 public:
     //! calculate number of items such that each BucketBlock has about 1 MiB of
     //! size, or at least 8 items.
@@ -173,7 +179,9 @@ public:
         while (TLX_UNLIKELY(mem::memory_exceeded && num_items_ != 0))
             SpillAnyPartition();
 
-        typename IndexFunction::Result h = calculate_index(kv);
+        if (CanBeReduced(kv)) return false;
+
+        typename IndexFunction::Result h = calculate_index(kv, 1);
 
         size_t local_index = h.local_index(num_buckets_per_partition_);
 
@@ -183,22 +191,6 @@ public:
         size_t global_index =
                 h.partition_id * num_buckets_per_partition_ + local_index;
         BucketBlock* current = buckets_[global_index];
-
-        while (current != nullptr)
-        {
-            // iterate over valid items in a block
-            for (TableItem* bi = current->items;
-                 bi != current->items + current->size; ++bi)
-            {
-                // if item and key equals, then reduce.
-                if (key_equal_function_(key(kv), key(*bi)))
-                {
-                    *bi = reduce(*bi, kv);
-                    return false;
-                }
-            }
-            current = current->next;
-        }
 
         // have an item that needs to be added.
 
@@ -240,6 +232,41 @@ public:
             SpillPartition(h.partition_id);
 
         return true;
+    }
+
+    bool CanBeReduced(const TableItem& kv) {
+        typename IndexFunction::Result h;
+
+        for(int i = 0; i < number_of_hashes; i++)
+        {
+            h = calculate_index(kv, i);
+
+            size_t local_index = h.local_index(num_buckets_per_partition_);
+
+            assert(h.partition_id < num_partitions_);
+            assert(local_index < num_buckets_per_partition_);
+
+            size_t global_index =
+                    h.partition_id * num_buckets_per_partition_ + local_index;
+            BucketBlock* current = buckets_[global_index];
+
+            while (current != nullptr)
+            {
+                // iterate over valid items in a block
+                for (TableItem* bi = current->items;
+                     bi != current->items + current->size; ++bi)
+                {
+                    // if item and key equals, then reduce.
+                    if (key_equal_function_(key(kv), key(*bi)))
+                    {
+                        *bi = reduce(*bi, kv);
+                        return true;
+                    }
+                }
+                current = current->next;
+            }
+        }
+        return false;
     }
 
     //! Deallocate memory
