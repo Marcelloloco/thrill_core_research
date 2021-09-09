@@ -50,10 +50,10 @@ public:
 
     //! only for CuckooHashTable: determines after how many displacements a loop
     //! will be declared
-    static constexpr int max_displacement_cycles_ = 15;
+    static constexpr int max_displacement_cycles_ = 10;
 
     //! number of different hashes that can be generated
-    static constexpr int number_of_hashes_ = 3;
+    static constexpr int num_hashes_ = 3;
 
     //! select the hash table in the reduce phase by enum
     static constexpr ReduceTableImpl table_impl_ = ReduceTableImpl::CUCKOO;
@@ -64,6 +64,10 @@ public:
     //! only for BucketHashTable: size of a block in the bucket chain in bytes
     //! (must be a static constexpr)
     static constexpr size_t bucket_block_size_ = 512;
+
+    //! only for CuckoHashTable: size of a block in the bucket chain in bytes
+    //! (must be a static constexpr)
+    static constexpr size_t cuckoo_block_size_ = 256;
 
     //! use MixStream instead of CatStream in ReduceNodes: this makes the order
     //! of items delivered in the ReduceFunction arbitrary.

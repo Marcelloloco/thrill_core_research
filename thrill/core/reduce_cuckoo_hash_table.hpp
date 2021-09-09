@@ -33,13 +33,13 @@ class ReduceCuckooHashTable
 
     //! target number of bytes in a BucketBlock.
     static constexpr size_t bucket_block_size
-            = ReduceConfig::bucket_block_size_;
+            = ReduceConfig::cuckoo_block_size_;
 
     static constexpr int max_displacement_cycles
             = ReduceConfig::max_displacement_cycles_;
 
     static constexpr int number_of_hashes
-            = ReduceConfig::number_of_hashes_;
+            = ReduceConfig::num_hashes_;
 
 public:
     //! calculate number of items such that each BucketBlock has about 1 MiB of
@@ -55,6 +55,8 @@ public:
 
         //! link of linked list to next block
         BucketBlock *next;
+
+        TableItem tmp;
 
         //! memory area of items
         TableItem items[block_size_]; // NOLINT
@@ -181,57 +183,74 @@ public:
 
         if (CanBeReduced(kv)) return false;
 
-        typename IndexFunction::Result h = calculate_index(kv, 1);
+        TableItem insert_element = kv;
+        int hash = 0;
 
-        size_t local_index = h.local_index(num_buckets_per_partition_);
+        for (int i = 0; i < max_displacement_cycles; ++i) {
+            typename IndexFunction::Result h = calculate_index(insert_element, hash);
 
-        assert(h.partition_id < num_partitions_);
-        assert(local_index < num_buckets_per_partition_);
+            size_t local_index = h.local_index(num_buckets_per_partition_);
 
-        size_t global_index =
-                h.partition_id * num_buckets_per_partition_ + local_index;
-        BucketBlock* current = buckets_[global_index];
+            assert(h.partition_id < num_partitions_);
+            assert(local_index < num_buckets_per_partition_);
 
-        // have an item that needs to be added.
+            size_t global_index =
+                    h.partition_id * num_buckets_per_partition_ + local_index;
+            BucketBlock* current = buckets_[global_index];
 
-        current = buckets_[global_index];
+            if (current == nullptr)
+            {
+                // new block needed.
 
-        if (current == nullptr || current->size == block_size_)
-        {
-            // new block needed.
+                // flush largest partition if max number of blocks reached
+                while (num_blocks_ > limit_blocks_)
+                    SpillAnyPartition();
 
-            // flush largest partition if max number of blocks reached
-            while (num_blocks_ > limit_blocks_)
-                SpillAnyPartition();
+                // allocate a new block of uninitialized items, prepend to bucket
+                current = block_pool_.GetBlock();
+                current->next = buckets_[global_index];
+                buckets_[global_index] = current;
 
-            // allocate a new block of uninitialized items, prepend to bucket
-            current = block_pool_.GetBlock();
-            current->next = buckets_[global_index];
-            buckets_[global_index] = current;
+                // Total number of blocks
+                ++num_blocks_;
+            }
 
-            // Total number of blocks
-            ++num_blocks_;
+            if (current->size == block_size_)
+            {
+                std::swap(*(current->items),current->tmp);
+                new (current->items)TableItem(insert_element);
+                insert_element = current->tmp;
+                hash=(hash+1)%number_of_hashes;
+                if(i>8) {
+                    std::cout << "hi" << std::endl;
+                }
+            } else {
+                // in-place construct/insert new item in current bucket block
+                new (current->items + current->size++)TableItem(insert_element);
+
+                LOGC(debug_items)
+                << "h.partition_id" << h.partition_id;
+
+                // Increase partition item count
+                ++items_per_partition_[h.partition_id];
+                ++num_items_;
+
+                LOGC(debug_items)
+                << "items_per_partition_[" << h.partition_id << "]"
+                << items_per_partition_[h.partition_id];
+
+                // flush current partition if max partition fill rate reached
+                while (items_per_partition_[h.partition_id] > limit_items_per_partition_)
+                    SpillPartition(h.partition_id);
+
+                return true;
+            }
         }
 
-        // in-place construct/insert new item in current bucket block
-        new (current->items + current->size++)TableItem(kv);
+        // Loop detected, flush items and try again
+        SpillAnyPartition();
 
-        LOGC(debug_items)
-            << "h.partition_id" << h.partition_id;
-
-        // Increase partition item count
-        ++items_per_partition_[h.partition_id];
-        ++num_items_;
-
-        LOGC(debug_items)
-            << "items_per_partition_[" << h.partition_id << "]"
-            << items_per_partition_[h.partition_id];
-
-        // flush current partition if max partition fill rate reached
-        while (items_per_partition_[h.partition_id] > limit_items_per_partition_)
-            SpillPartition(h.partition_id);
-
-        return true;
+        return Insert(insert_element);
     }
 
     bool CanBeReduced(const TableItem& kv) {
