@@ -56,8 +56,6 @@ public:
         //! link of linked list to next block
         BucketBlock *next;
 
-        TableItem tmp;
-
         //! memory area of items
         TableItem items[block_size_]; // NOLINT
 
@@ -184,6 +182,7 @@ public:
         if (CanBeReduced(kv)) return false;
 
         TableItem insert_element = kv;
+        TableItem tmp_;
         int hash = 0;
 
         for (int i = 0; i < max_displacement_cycles; ++i) {
@@ -217,13 +216,10 @@ public:
 
             if (current->size == block_size_)
             {
-                std::swap(*(current->items),current->tmp);
+                std::swap(*(current->items),tmp_);
                 new (current->items)TableItem(insert_element);
-                insert_element = current->tmp;
+                insert_element = tmp_;
                 hash=(hash+1)%number_of_hashes;
-                if(i>8) {
-                    std::cout << "hi" << std::endl;
-                }
             } else {
                 // in-place construct/insert new item in current bucket block
                 new (current->items + current->size++)TableItem(insert_element);
