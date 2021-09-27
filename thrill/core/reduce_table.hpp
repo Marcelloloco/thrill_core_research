@@ -42,7 +42,7 @@ class DefaultReduceConfig
 public:
     //! limit on the fill rate of a reduce table partition prior to triggering a
     //! flush.
-    double limit_partition_fill_rate_ = 0.5;
+    double limit_partition_fill_rate_ = 0.9;
 
     //! only for BucketHashTable: ratio of number of buckets in a partition
     //! relative to the maximum possible number.
@@ -67,7 +67,7 @@ public:
 
     //! only for CuckoHashTable: size of a block in the bucket chain in bytes
     //! (must be a static constexpr)
-    static constexpr size_t cuckoo_block_size_ = 256;
+    static constexpr size_t cuckoo_block_size_ = 128;
 
     //! use MixStream instead of CatStream in ReduceNodes: this makes the order
     //! of items delivered in the ReduceFunction arbitrary.
